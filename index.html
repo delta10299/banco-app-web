@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Banco Profesional</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #e0eafc, #cfdef3);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .container {
+      background: #fff;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+      max-width: 500px;
+      width: 100%;
+    }
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+    }
+    input, button, select {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    .saldo {
+      font-size: 1.5em;
+      font-weight: bold;
+      color: #27ae60;
+      margin: 15px 0;
+      text-align: center;
+    }
+    .log {
+      background-color: #f4f6f7;
+      padding: 10px;
+      border-radius: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 20px;
+      border: 1px solid #ccc;
+    }
+    .currency-group {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Banca Profesional</h1>
+    <div id="login">
+      <input type="text" id="usuario" placeholder="Nombre de usuario">
+      <button onclick="iniciarSesion()">Iniciar sesión</button>
+    </div>
+
+    <div id="panel" style="display:none">
+      <div class="saldo">Saldo: <span id="saldo">0</span> <span id="moneda">COP</span></div>
+
+      <input type="number" id="monto" placeholder="Monto">
+
+      <div class="currency-group">
+        <button onclick="cambiarMoneda('COP')">Pesos</button>
+        <button onclick="cambiarMoneda('USD')">Dólares</button>
+        <button onclick="cambiarMoneda('EUR')">Euros</button>
+      </div>
+
+      <button onclick="depositar()">Depositar</button>
+      <button onclick="retirar()">Retirar</button>
+      <input type="text" id="destino" placeholder="Transferir a (usuario)">
+      <button onclick="transferir()">Transferir</button>
+      <button onclick="cerrarSesion()" style="background:#e74c3c;margin-top:10px;">Cerrar sesión</button>
+      <div class="log" id="historial"></div>
+    </div>
+  </div>
+
+  <script>
+    let usuarioActual = null;
+    let monedaActual = 'COP';
+    const tasas = {
+      COP: 1,
+      USD: 0.00025,
+      EUR: 0.00023
+    };
+
+    function iniciarSesion() {
+      const usuario = document.getElementById("usuario").value.trim();
+      if (!usuario) return alert("Ingresa un nombre de usuario");
+      usuarioActual = usuario;
+      if (!localStorage.getItem(usuario)) {
+        localStorage.setItem(usuario, JSON.stringify({ saldo: 0, historial: [] }));
+      }
+      document.getElementById("login").style.display = "none";
+      document.getElementById("panel").style.display = "block";
+      cargarDatos();
+    }
+
+    function cargarDatos() {
+      const datos = JSON.parse(localStorage.getItem(usuarioActual));
+      const saldoConvertido = (datos.saldo * tasas[monedaActual]).toFixed(2);
+      document.getElementById("saldo").textContent = saldoConvertido;
+      document.getElementById("moneda").textContent = monedaActual;
+      const log = datos.historial.map(e => `<div>${e}</div>`).join('');
+      document.getElementById("historial").innerHTML = log;
+    }
+
+    function actualizarDatos(nuevoSaldo, mensaje) {
+      const datos = JSON.parse(localStorage.getItem(usuarioActual));
+      datos.saldo = nuevoSaldo;
+      datos.historial.unshift(mensaje);
+      localStorage.setItem(usuarioActual, JSON.stringify(datos));
+      cargarDatos();
+    }
+
+    function convertirAMonedaLocal(monto) {
+      return (monto / tasas[monedaActual]);
+    }
+
+    function depositar() {
+      let monto = parseFloat(document.getElementById("monto").value);
+      if (monto <= 0 || isNaN(monto)) return alert("Monto inválido");
+      monto = convertirAMonedaLocal(monto);
+      const datos = JSON.parse(localStorage.getItem(usuarioActual));
+      const nuevoSaldo = datos.saldo + monto;
+      actualizarDatos(nuevoSaldo, `Depósito: +${monto.toFixed(2)} COP`);
+    }
+
+    function retirar() {
+      let monto = parseFloat(document.getElementById("monto").value);
+      if (monto <= 0 || isNaN(monto)) return alert("Monto inválido");
+      monto = convertirAMonedaLocal(monto);
+      const datos = JSON.parse(localStorage.getItem(usuarioActual));
+      if (datos.saldo < monto) return alert("Fondos insuficientes");
+      const nuevoSaldo = datos.saldo - monto;
+      actualizarDatos(nuevoSaldo, `Retiro: -${monto.toFixed(2)} COP`);
+    }
+
+    function transferir() {
+      let monto = parseFloat(document.getElementById("monto").value);
+      const destino = document.getElementById("destino").value.trim();
+      if (destino === usuarioActual) return alert("No puedes transferirte a ti mismo");
+      if (!destino || isNaN(monto) || monto <= 0) return alert("Datos inválidos");
+      monto = convertirAMonedaLocal(monto);
+      const datos = JSON.parse(localStorage.getItem(usuarioActual));
+      if (datos.saldo < monto) return alert("Fondos insuficientes");
+
+      if (!localStorage.getItem(destino)) {
+        localStorage.setItem(destino, JSON.stringify({ saldo: 0, historial: [] }));
+      }
+
+      const datosDestino = JSON.parse(localStorage.getItem(destino));
+      datosDestino.saldo += monto;
+      datosDestino.historial.unshift(`Transferencia recibida de ${usuarioActual}: +${monto.toFixed(2)} COP`);
+      localStorage.setItem(destino, JSON.stringify(datosDestino));
+
+      const nuevoSaldo = datos.saldo - monto;
+      actualizarDatos(nuevoSaldo, `Transferencia a ${destino}: -${monto.toFixed(2)} COP`);
+    }
+
+    function cambiarMoneda(moneda) {
+      monedaActual = moneda;
+      cargarDatos();
+    }
+
+    function cerrarSesion() {
+      usuarioActual = null;
+      document.getElementById("login").style.display = "block";
+      document.getElementById("panel").style.display = "none";
+      document.getElementById("usuario").value = "";
+    }
+  </script>
+</body>
+</html>
